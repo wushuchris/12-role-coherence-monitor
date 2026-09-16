@@ -86,6 +86,28 @@ def advance(
     )
 
 
+def advance_with_semantic_scope_signal(
+    sequence_number: int,
+    *,
+    previous_state,
+    score: float = 0.75,
+):
+    turn = make_turn(sequence_number)
+    assessment = make_assessment(turn, score=score)
+    signal = make_signal(
+        turn,
+        signal_type=SignalType.SCOPE_DRIFT,
+        severity=SignalSeverity.MEDIUM,
+        source=SignalSource.SEMANTIC,
+    )
+    return advance_coherence_state(
+        turn=turn,
+        assessment=assessment,
+        signals=(signal,),
+        previous_state=previous_state,
+    )
+
+
 def test_clean_initial_turn_is_coherent():
     state = advance(1)
 
@@ -101,15 +123,27 @@ def test_single_soft_warning_moves_to_watch():
     assert state.consecutive_warning_turns == 1
 
 
-def test_repeated_soft_warnings_progress_to_drifting_then_realign_required():
+def test_repeated_soft_warnings_progress_to_drifting_then_realign_with_signal():
     first = advance(1, score=0.75)
     second = advance(2, previous_state=first, score=0.75)
-    third = advance(3, previous_state=second, score=0.75)
+    third = advance_with_semantic_scope_signal(3, previous_state=second, score=0.75)
 
     assert first.status is CoherenceStatus.WATCH
     assert second.status is CoherenceStatus.DRIFTING
     assert third.status is CoherenceStatus.REALIGN_REQUIRED
     assert third.consecutive_warning_turns == 3
+    assert len(third.recent_signal_ids) == 1
+
+
+def test_scores_alone_do_not_force_realign_without_auditable_signal():
+    first = advance(1, score=0.75)
+    second = advance(2, previous_state=first, score=0.75)
+    third = advance(3, previous_state=second, score=0.75)
+
+    assert second.status is CoherenceStatus.DRIFTING
+    assert third.status is CoherenceStatus.DRIFTING
+    assert third.consecutive_warning_turns == 3
+    assert third.recent_signal_ids == ()
 
 
 def test_severe_dimension_failure_jumps_directly_to_drifting():
@@ -186,7 +220,7 @@ def test_recovery_from_drifting_is_gradual_not_instant():
 def test_successful_repair_returns_to_watch_before_coherent():
     watch = advance(1, score=0.75)
     drifting = advance(2, previous_state=watch, score=0.75)
-    realign = advance(3, previous_state=drifting, score=0.75)
+    realign = advance_with_semantic_scope_signal(3, previous_state=drifting, score=0.75)
 
     repaired = advance(
         4,
@@ -205,7 +239,7 @@ def test_successful_repair_returns_to_watch_before_coherent():
 def test_failed_repairs_escalate_to_human_review_after_bounded_attempts():
     watch = advance(1, score=0.75)
     drifting = advance(2, previous_state=watch, score=0.75)
-    realign = advance(3, previous_state=drifting, score=0.75)
+    realign = advance_with_semantic_scope_signal(3, previous_state=drifting, score=0.75)
 
     first_failed_repair = advance(
         4,
