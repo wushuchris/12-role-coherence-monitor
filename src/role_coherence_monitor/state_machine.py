@@ -153,7 +153,9 @@ def advance_coherence_state(
 
     The transition policy distinguishes clean behavior, isolated warnings,
     sustained warnings, severe drift, immediate hard violations, repair, and
-    gradual recovery. LLM-generated assessments never set the final status.
+    gradual recovery. Scores can establish drift, but mandatory realignment
+    requires an auditable warning signal. LLM-generated assessments never set
+    the final status.
     """
 
     current_signals = tuple(signals)
@@ -177,10 +179,10 @@ def advance_coherence_state(
     scores = _assessment_scores(assessment)
     severe_drift = any(score < policy.drift_score_threshold for score in scores)
     score_warning = any(score < policy.warning_score_threshold for score in scores)
-    signal_warning = any(
+    actionable_signal_present = any(
         signal.severity in _WARNING_SEVERITIES for signal in current_signals
     )
-    warning_present = score_warning or signal_warning
+    warning_present = score_warning or actionable_signal_present
     warning_turns = previous_warning_turns + 1 if warning_present else 0
 
     immediate_state = _immediate_control_state(current_signals)
@@ -203,7 +205,10 @@ def advance_coherence_state(
     elif previous_status is CoherenceStatus.DRIFTING:
         if not warning_present:
             status = CoherenceStatus.WATCH
-        elif severe_drift or warning_turns >= policy.warning_turns_to_realign:
+        elif (
+            actionable_signal_present
+            and (severe_drift or warning_turns >= policy.warning_turns_to_realign)
+        ):
             status = CoherenceStatus.REALIGN_REQUIRED
         else:
             status = CoherenceStatus.DRIFTING
