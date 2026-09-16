@@ -16,6 +16,7 @@ from .schemas import (
     CoherenceStatus,
     InteractionTurn,
     SignalSeverity,
+    SignalSource,
     SignalType,
     TurnAssessment,
 )
@@ -126,7 +127,8 @@ def _immediate_control_state(
     deterministic_critical_types = {
         signal.signal_type
         for signal in signals
-        if signal.severity is SignalSeverity.CRITICAL
+        if signal.source is SignalSource.DETERMINISTIC
+        and signal.severity is SignalSeverity.CRITICAL
     }
 
     if deterministic_critical_types & _BLOCK_IMMEDIATELY:
