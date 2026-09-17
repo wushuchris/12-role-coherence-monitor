@@ -200,6 +200,8 @@ class RoleRepairDirective(StrictModel):
 class CoherenceAuditEvent(StrictModel):
     """Append-only linkage between turns, evidence, state, repair, and outcome."""
 
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
     event_id: NonEmptyStr
     event_type: AuditEventType
     turn_id: NonEmptyStr | None = None
