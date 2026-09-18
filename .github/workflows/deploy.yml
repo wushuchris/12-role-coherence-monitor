@@ -1,0 +1,47 @@
+name: Deploy to Hugging Face
+
+on:
+  workflow_run:
+    workflows:
+      - Tests
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.event == 'push' &&
+          vars.HF_DEPLOY_ENABLED == 'true' &&
+          vars.HF_SPACE_ID != '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Prepare Hugging Face Space README
+        run: cp deploy/SPACE_README.md README.md
+
+      - name: Sync tested runtime files to Hugging Face Space
+        uses: huggingface/hub-sync@v0.3.0
+        with:
+          github_repo_id: ${{ github.repository }}
+          huggingface_repo_id: ${{ vars.HF_SPACE_ID }}
+          hf_token: ${{ secrets.HF_DEPLOY_TOKEN }}
+          repo_type: space
+          space_sdk: gradio
+          private: false
+          include: |
+            README.md
+            LICENSE
+            requirements.txt
+            app.py
+            src/*
+          delete_removed: true
