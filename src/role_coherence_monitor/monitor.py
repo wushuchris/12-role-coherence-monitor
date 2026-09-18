@@ -131,7 +131,10 @@ class RoleCoherenceMonitor:
             turn=turn,
             history=current_session.history,
         )
-        self._validate_semantic_evidence(semantic_result)
+        self._validate_semantic_evidence(
+            semantic_result,
+            deterministic_signals=deterministic_signals,
+        )
 
         assessment = to_turn_assessment(
             semantic_result,
@@ -249,8 +252,19 @@ class RoleCoherenceMonitor:
                     "Session state and interaction history are inconsistent"
                 )
 
-    def _validate_semantic_evidence(self, semantic_result) -> None:
-        """Require auditable evidence whenever semantic scores affect control state."""
+    def _validate_semantic_evidence(
+        self,
+        semantic_result,
+        *,
+        deterministic_signals: tuple[CoherenceSignal, ...],
+    ) -> None:
+        """Require auditable evidence when semantic scores are the control evidence."""
+
+        # Deterministic evidence is independently auditable and application-owned.
+        # Do not let semantic calibration failures suppress a deterministic control
+        # decision such as a prohibited-action block or mandatory escalation.
+        if deterministic_signals:
+            return
 
         scores = (
             semantic_result.mission_alignment,
