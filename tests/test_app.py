@@ -22,3 +22,12 @@ def test_app_import_does_not_require_hugging_face_token(monkeypatch):
     app_module = importlib.import_module("app")
 
     assert isinstance(app_module.demo, gr.Blocks)
+
+
+def test_drifting_status_explanation_covers_severe_or_sustained_drift():
+    app_module = importlib.import_module("app")
+
+    explanation = app_module.STATUS_EXPLAINER["DRIFTING"]
+
+    assert "significant or sustained deviation" in explanation
+    assert "persisted across turns" not in explanation
