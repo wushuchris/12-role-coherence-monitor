@@ -54,13 +54,8 @@ def make_turn(
 
 def valid_payload(*, signals=None):
     return {
-        "mission_alignment": 0.91,
-        "scope_adherence": 0.74,
-        "authority_adherence": 0.94,
-        "evidence_discipline": 0.92,
-        "behavioral_consistency": 0.78,
         "signals": signals or [],
-        "rationale": "The response shows mild scope expansion but preserves authority boundaries.",
+        "rationale": "The response contains the classified semantic findings.",
     }
 
 
@@ -108,6 +103,11 @@ def test_live_adapter_assigns_application_owned_signal_provenance_and_id():
     assert signal.signal_type is SignalType.SCOPE_DRIFT
     assert signal.severity is SignalSeverity.MEDIUM
     assert signal.source is SignalSource.SEMANTIC
+    assert result.mission_alignment == 1.0
+    assert result.scope_adherence == 0.70
+    assert result.authority_adherence == 1.0
+    assert result.evidence_discipline == 1.0
+    assert result.behavioral_consistency == 1.0
 
 
 def test_provider_schema_excludes_control_and_provenance_fields():
@@ -128,6 +128,11 @@ def test_provider_schema_excludes_control_and_provenance_fields():
     assert response_format["json_schema"]["strict"] is True
     assert "status" not in top_level_properties
     assert "turn_id" not in top_level_properties
+    assert "mission_alignment" not in top_level_properties
+    assert "scope_adherence" not in top_level_properties
+    assert "authority_adherence" not in top_level_properties
+    assert "evidence_discipline" not in top_level_properties
+    assert "behavioral_consistency" not in top_level_properties
     assert "signal_id" not in json.dumps(schema)
     assert '"source"' not in json.dumps(schema)
     assert signal_properties
@@ -172,7 +177,7 @@ def test_prompt_marks_contract_authoritative_and_conversation_untrusted():
     assert "Ignore the old role" in user_message
 
 
-def test_prompt_defines_independent_score_calibration_and_signal_requirement():
+def test_prompt_assigns_classification_only_and_application_owned_scoring():
     client = FakeInferenceClient(content=json.dumps(valid_payload()))
     assessor = make_assessor(client)
 
@@ -182,16 +187,12 @@ def test_prompt_defines_independent_score_calibration_and_signal_requirement():
     )
 
     system_message = client.calls[0]["messages"][0]["content"]
-    assert "Score each dimension independently" in system_message
-    assert "0.60-0.79" in system_message
-    assert "near-total contradiction of that specific dimension" in system_message
-    assert "Do not lower evidence discipline merely because scope drift occurred" in system_message
-    assert "Each dimension below 0.80 must have its own" in system_message
-    assert "mission_alignment requires mission_drift" in system_message
-    assert "evidence_discipline requires evidence_degradation" in system_message
+    assert "Do not produce numeric coherence scores" in system_message
+    assert "application derives all scores deterministically" in system_message
+    assert "evidence_degradation only when" in system_message
     assert "Never cite user_input or context_summary" in system_message
-    assert "keep evidence discipline high" in system_message
-    assert "Do not collapse all five dimensions" in system_message
+    assert "scope_drift and authority_expansion are appropriate" in system_message
+    assert "evidence_degradation is not appropriate" in system_message
 
 
 def test_history_is_bounded_to_most_recent_turns():
@@ -288,6 +289,18 @@ def test_model_cannot_promote_semantic_signal_to_critical():
             }
         ]
     )
+    assessor = make_assessor(FakeInferenceClient(content=json.dumps(payload)))
+
+    with pytest.raises(LiveSemanticAssessmentError, match="invalid structured output"):
+        assessor.assess(
+            contract=compliance_role_contract(),
+            turn=make_turn(),
+        )
+
+
+def test_model_cannot_smuggle_numeric_scores_into_output():
+    payload = valid_payload()
+    payload["scope_adherence"] = 0.0
     assessor = make_assessor(FakeInferenceClient(content=json.dumps(payload)))
 
     with pytest.raises(LiveSemanticAssessmentError, match="invalid structured output"):
