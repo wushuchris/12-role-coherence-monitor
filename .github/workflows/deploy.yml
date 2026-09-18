@@ -17,7 +17,7 @@ jobs:
           github.event.workflow_run.head_branch == 'main' &&
           github.event.workflow_run.event == 'push' &&
           vars.HF_DEPLOY_ENABLED == 'true' &&
-          vars.HF_SPACE_ID != '' }}
+          true }}
     runs-on: ubuntu-latest
 
     steps:
@@ -33,7 +33,7 @@ jobs:
         uses: huggingface/hub-sync@v0.3.0
         with:
           github_repo_id: ${{ github.repository }}
-          huggingface_repo_id: ${{ vars.HF_SPACE_ID }}
+          huggingface_repo_id: FlyingNunchucks/12-role-coherence-monitor
           hf_token: ${{ secrets.HF_DEPLOY_TOKEN }}
           repo_type: space
           space_sdk: gradio
