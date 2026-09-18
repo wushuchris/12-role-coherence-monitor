@@ -132,6 +132,16 @@ def test_repair_rejects_signal_from_stale_turn():
         )
 
 
+def test_repair_rejects_trigger_when_state_has_no_recorded_signals():
+    with pytest.raises(RepairPolicyError, match="contains no recorded signals"):
+        build_role_repair_directive(
+            contract=make_contract(),
+            state=make_state(recent_signal_ids=()),
+            triggering_signals=(make_signal(),),
+            next_allowed_action="request_clarification",
+        )
+
+
 def test_repair_rejects_signal_not_recorded_in_current_state():
     signal = make_signal(signal_id="signal-003-unrecorded")
 
