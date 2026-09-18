@@ -120,17 +120,22 @@ def build_role_repair_directive(
             "Repair signals must belong to the state's current turn: " f"{wrong_turn}"
         )
 
-    if state.recent_signal_ids:
-        unrecorded = [
-            signal.signal_id
-            for signal in signals
-            if signal.signal_id not in state.recent_signal_ids
-        ]
-        if unrecorded:
-            raise RepairPolicyError(
-                "Repair signals must be recorded in the current coherence state: "
-                f"{unrecorded}"
-            )
+    if not state.recent_signal_ids:
+        raise RepairPolicyError(
+            "Repair cannot be issued because the current coherence state "
+            "contains no recorded signals"
+        )
+
+    unrecorded = [
+        signal.signal_id
+        for signal in signals
+        if signal.signal_id not in state.recent_signal_ids
+    ]
+    if unrecorded:
+        raise RepairPolicyError(
+            "Repair signals must be recorded in the current coherence state: "
+            f"{unrecorded}"
+        )
 
     if next_allowed_action not in contract.permitted_actions:
         raise RepairPolicyError(
