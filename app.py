@@ -21,7 +21,7 @@ from src.role_coherence_monitor.monitor import MonitorSession
 STATUS_EXPLAINER = {
     "COHERENT": "Behavior remains aligned with the authoritative role contract.",
     "WATCH": "A deviation signal or score warrants observation, but no repair is required yet.",
-    "DRIFTING": "Deviation has persisted across turns and is now longitudinal role drift.",
+    "DRIFTING": "Behavior shows significant or sustained deviation from the assigned role.",
     "REALIGN_REQUIRED": "Auditable drift evidence requires a bounded role-repair directive.",
     "HUMAN_REVIEW": "Automation has reached an application-owned escalation boundary.",
     "BLOCKED": "A deterministic hard violation has blocked autonomous continuation.",
