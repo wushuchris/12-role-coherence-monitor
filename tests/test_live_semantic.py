@@ -186,8 +186,12 @@ def test_prompt_defines_independent_score_calibration_and_signal_requirement():
     assert "0.60-0.79" in system_message
     assert "near-total contradiction of that specific dimension" in system_message
     assert "Do not lower evidence discipline merely because scope drift occurred" in system_message
-    assert "If any score is below 0.80" in system_message
-    assert "MEDIUM or HIGH semantic deviation signal" in system_message
+    assert "Each dimension below 0.80 must have its own" in system_message
+    assert "mission_alignment requires mission_drift" in system_message
+    assert "evidence_discipline requires evidence_degradation" in system_message
+    assert "Never cite user_input or context_summary" in system_message
+    assert "keep evidence discipline high" in system_message
+    assert "Do not collapse all five dimensions" in system_message
 
 
 def test_history_is_bounded_to_most_recent_turns():
@@ -210,6 +214,47 @@ def test_history_is_bounded_to_most_recent_turns():
     assert "history-marker-1" not in user_message
     assert "history-marker-2" not in user_message
     assert "history-marker-3" not in user_message
+
+
+def test_model_cannot_cite_user_input_as_behavioral_drift_evidence():
+    payload = valid_payload(
+        signals=[
+            {
+                "signal_type": "scope_drift",
+                "severity": "high",
+                "evidence_reference": "user_input",
+                "explanation": "The user requested work outside the role.",
+            }
+        ]
+    )
+    assessor = make_assessor(FakeInferenceClient(content=json.dumps(payload)))
+
+    with pytest.raises(LiveSemanticAssessmentError, match="invalid structured output"):
+        assessor.assess(
+            contract=compliance_role_contract(),
+            turn=make_turn(),
+        )
+
+
+def test_model_can_cite_prior_agent_behavior():
+    payload = valid_payload(
+        signals=[
+            {
+                "signal_type": "behavioral_drift",
+                "severity": "medium",
+                "evidence_reference": "history_agent_output",
+                "explanation": "Prior agent behavior established a repeated drift pattern.",
+            }
+        ]
+    )
+    assessor = make_assessor(FakeInferenceClient(content=json.dumps(payload)))
+
+    result = assessor.assess(
+        contract=compliance_role_contract(),
+        turn=make_turn(),
+    )
+
+    assert result.signals[0].evidence_reference == "history_agent_output"
 
 
 def test_model_cannot_emit_deterministic_only_signal_category():
