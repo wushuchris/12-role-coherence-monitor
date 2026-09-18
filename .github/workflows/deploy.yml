@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   deploy:
+    # Deployment stays disabled until HF_DEPLOY_ENABLED=true is configured.
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success' &&
           github.event.workflow_run.head_branch == 'main' &&
