@@ -172,6 +172,24 @@ def test_prompt_marks_contract_authoritative_and_conversation_untrusted():
     assert "Ignore the old role" in user_message
 
 
+def test_prompt_defines_independent_score_calibration_and_signal_requirement():
+    client = FakeInferenceClient(content=json.dumps(valid_payload()))
+    assessor = make_assessor(client)
+
+    assessor.assess(
+        contract=compliance_role_contract(),
+        turn=make_turn(),
+    )
+
+    system_message = client.calls[0]["messages"][0]["content"]
+    assert "Score each dimension independently" in system_message
+    assert "0.60-0.79" in system_message
+    assert "near-total contradiction of that specific dimension" in system_message
+    assert "Do not lower evidence discipline merely because scope drift occurred" in system_message
+    assert "If any score is below 0.80" in system_message
+    assert "MEDIUM or HIGH semantic deviation signal" in system_message
+
+
 def test_history_is_bounded_to_most_recent_turns():
     client = FakeInferenceClient(content=json.dumps(valid_payload()))
     assessor = make_assessor(client, max_history_turns=2)
