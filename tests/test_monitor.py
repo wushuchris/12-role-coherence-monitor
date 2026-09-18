@@ -420,7 +420,7 @@ def test_control_relevant_semantic_scores_require_auditable_signal():
 
     with pytest.raises(
         MonitorProcessingError,
-        match="auditable MEDIUM/HIGH semantic deviation evidence",
+        match="matching MEDIUM/HIGH semantic evidence",
     ):
         monitor.process_turn(
             turn=step.turn,
@@ -450,7 +450,7 @@ def test_control_relevant_score_with_medium_semantic_signal_is_accepted():
         scope_adherence=0.50,
         authority_adherence=0.90,
         evidence_discipline=0.95,
-        behavioral_consistency=0.75,
+        behavioral_consistency=0.85,
         signals=(signal,),
         rationale="Substantial scope violation with otherwise preserved evidence discipline.",
     )
@@ -504,9 +504,77 @@ def test_low_severity_signal_does_not_satisfy_auditability_gate():
 
     with pytest.raises(
         MonitorProcessingError,
-        match="auditable MEDIUM/HIGH semantic deviation evidence",
+        match="matching MEDIUM/HIGH semantic evidence",
     ):
         monitor.process_turn(turn=step.turn)
+
+
+def test_each_low_dimension_requires_its_matching_signal_type():
+    scenario = clean_conversation()
+    step = scenario.steps[0]
+    scope_signal = CoherenceSignal(
+        signal_id=f"semantic:{step.turn.turn_id}:scope_drift:1",
+        turn_id=step.turn.turn_id,
+        signal_type=SignalType.SCOPE_DRIFT,
+        severity=SignalSeverity.HIGH,
+        source=SignalSource.SEMANTIC,
+        evidence_reference="agent_output",
+        explanation="The agent accepted responsibility beyond the review scope.",
+    )
+    semantic_result = SemanticAssessmentResult(
+        turn_id=step.turn.turn_id,
+        mission_alignment=0.90,
+        scope_adherence=0.40,
+        authority_adherence=0.90,
+        evidence_discipline=0.40,
+        behavioral_consistency=0.90,
+        signals=(scope_signal,),
+        rationale="Scope drift is evidenced, but evidence discipline is not.",
+    )
+    monitor = RoleCoherenceMonitor(
+        contract=compliance_role_contract(),
+        semantic_assessor=MockSemanticAssessor(
+            {step.turn.turn_id: semantic_result}
+        ),
+        repair_next_action="request_clarification",
+    )
+
+    with pytest.raises(
+        MonitorProcessingError,
+        match="evidence_discipline->evidence_degradation",
+    ):
+        monitor.process_turn(turn=step.turn)
+
+
+def test_noncritical_deterministic_signal_does_not_bypass_semantic_gate():
+    scenario = clean_conversation()
+    base_turn = scenario.steps[0].turn
+    turn = base_turn.model_copy(
+        update={"attempted_actions": ("unknown_application_action",)}
+    )
+    semantic_result = SemanticAssessmentResult(
+        turn_id=turn.turn_id,
+        mission_alignment=0.95,
+        scope_adherence=0.50,
+        authority_adherence=0.95,
+        evidence_discipline=0.95,
+        behavioral_consistency=0.95,
+        signals=(),
+        rationale="Injected low scope score without semantic evidence.",
+    )
+    monitor = RoleCoherenceMonitor(
+        contract=compliance_role_contract(),
+        semantic_assessor=MockSemanticAssessor(
+            {turn.turn_id: semantic_result}
+        ),
+        repair_next_action="request_clarification",
+    )
+
+    with pytest.raises(
+        MonitorProcessingError,
+        match="scope_adherence->scope_drift",
+    ):
+        monitor.process_turn(turn=turn)
 
 
 def test_semantic_assessor_failure_leaves_supplied_session_unchanged():
