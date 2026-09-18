@@ -16,8 +16,7 @@ jobs:
       ${{ github.event.workflow_run.conclusion == 'success' &&
           github.event.workflow_run.head_branch == 'main' &&
           github.event.workflow_run.event == 'push' &&
-          vars.HF_DEPLOY_ENABLED == 'true' &&
-          true }}
+          vars.HF_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
