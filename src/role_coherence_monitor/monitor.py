@@ -260,41 +260,63 @@ class RoleCoherenceMonitor:
     ) -> None:
         """Require auditable evidence when semantic scores are the control evidence."""
 
-        # Deterministic evidence is independently auditable and application-owned.
-        # Do not let semantic calibration failures suppress a deterministic control
-        # decision such as a prohibited-action block or mandatory escalation.
-        if deterministic_signals:
+        # Deterministic CRITICAL evidence is independently auditable and can force
+        # an application-owned terminal control decision without semantic support.
+        if any(
+            signal.severity is SignalSeverity.CRITICAL
+            for signal in deterministic_signals
+        ):
             return
 
-        scores = (
-            semantic_result.mission_alignment,
-            semantic_result.scope_adherence,
-            semantic_result.authority_adherence,
-            semantic_result.evidence_discipline,
-            semantic_result.behavioral_consistency,
+        required_signals = (
+            (
+                "mission_alignment",
+                semantic_result.mission_alignment,
+                SignalType.MISSION_DRIFT,
+            ),
+            (
+                "scope_adherence",
+                semantic_result.scope_adherence,
+                SignalType.SCOPE_DRIFT,
+            ),
+            (
+                "authority_adherence",
+                semantic_result.authority_adherence,
+                SignalType.AUTHORITY_EXPANSION,
+            ),
+            (
+                "evidence_discipline",
+                semantic_result.evidence_discipline,
+                SignalType.EVIDENCE_DEGRADATION,
+            ),
+            (
+                "behavioral_consistency",
+                semantic_result.behavioral_consistency,
+                SignalType.BEHAVIORAL_DRIFT,
+            ),
         )
-        control_relevant_score = any(
-            score < self._policy.warning_score_threshold for score in scores
-        )
-        if not control_relevant_score:
-            return
 
-        deviation_types = {
-            SignalType.MISSION_DRIFT,
-            SignalType.SCOPE_DRIFT,
-            SignalType.AUTHORITY_EXPANSION,
-            SignalType.BEHAVIORAL_DRIFT,
-            SignalType.EVIDENCE_DEGRADATION,
-        }
-        has_auditable_deviation = any(
-            signal.signal_type in deviation_types
-            and signal.severity in {SignalSeverity.MEDIUM, SignalSeverity.HIGH}
-            for signal in semantic_result.signals
-        )
-        if not has_auditable_deviation:
+        missing_evidence: list[str] = []
+        for dimension, score, required_type in required_signals:
+            if score >= self._policy.warning_score_threshold:
+                continue
+
+            matched = any(
+                signal.signal_type is required_type
+                and signal.severity
+                in {SignalSeverity.MEDIUM, SignalSeverity.HIGH}
+                for signal in semantic_result.signals
+            )
+            if not matched:
+                missing_evidence.append(
+                    f"{dimension}->{required_type.value}"
+                )
+
+        if missing_evidence:
             raise MonitorProcessingError(
-                "Semantic assessment lowered a control-relevant score without "
-                "auditable MEDIUM/HIGH semantic deviation evidence"
+                "Semantic assessment lowered control-relevant dimensions without "
+                "matching MEDIUM/HIGH semantic evidence: "
+                + ", ".join(missing_evidence)
             )
 
     def _maybe_issue_repair(
