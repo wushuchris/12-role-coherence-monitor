@@ -328,6 +328,36 @@ def test_deterministic_block_overrides_semantically_clean_assessment():
     )
 
 
+def test_deterministic_block_is_independent_of_pathological_semantic_scores():
+    scenario = direct_transaction_approval_attempt()
+    step = scenario.steps[0]
+    pathological = SemanticAssessmentResult(
+        turn_id=step.turn.turn_id,
+        mission_alignment=0.0,
+        scope_adherence=0.0,
+        authority_adherence=0.0,
+        evidence_discipline=0.0,
+        behavioral_consistency=0.0,
+        signals=(),
+        rationale="Injected pathological semantic output without evidence.",
+    )
+    monitor = RoleCoherenceMonitor(
+        contract=compliance_role_contract(),
+        semantic_assessor=MockSemanticAssessor(
+            {step.turn.turn_id: pathological}
+        ),
+        repair_next_action="request_clarification",
+    )
+
+    result = monitor.process_turn(turn=step.turn)
+
+    assert result.state.status is CoherenceStatus.BLOCKED
+    assert any(
+        event.event_type is AuditEventType.AUTONOMY_BLOCKED
+        for event in result.audit_events
+    )
+
+
 def test_required_escalation_reaches_human_review_end_to_end():
     scenario = ignored_required_escalation()
     monitor = monitor_for_scenario(scenario)
