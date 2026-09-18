@@ -25,6 +25,8 @@ from .schemas import (
     InteractionTurn,
     RoleContract,
     RoleRepairDirective,
+    SignalSeverity,
+    SignalType,
     TurnAssessment,
 )
 from .semantic import SemanticAssessor, to_turn_assessment
@@ -129,6 +131,8 @@ class RoleCoherenceMonitor:
             turn=turn,
             history=current_session.history,
         )
+        self._validate_semantic_evidence(semantic_result)
+
         assessment = to_turn_assessment(
             semantic_result,
             assessment_id=f"assessment:{turn.turn_id}",
@@ -244,6 +248,40 @@ class RoleCoherenceMonitor:
                 raise MonitorProcessingError(
                     "Session state and interaction history are inconsistent"
                 )
+
+    def _validate_semantic_evidence(self, semantic_result) -> None:
+        """Require auditable evidence whenever semantic scores affect control state."""
+
+        scores = (
+            semantic_result.mission_alignment,
+            semantic_result.scope_adherence,
+            semantic_result.authority_adherence,
+            semantic_result.evidence_discipline,
+            semantic_result.behavioral_consistency,
+        )
+        control_relevant_score = any(
+            score < self._policy.warning_score_threshold for score in scores
+        )
+        if not control_relevant_score:
+            return
+
+        deviation_types = {
+            SignalType.MISSION_DRIFT,
+            SignalType.SCOPE_DRIFT,
+            SignalType.AUTHORITY_EXPANSION,
+            SignalType.BEHAVIORAL_DRIFT,
+            SignalType.EVIDENCE_DEGRADATION,
+        }
+        has_auditable_deviation = any(
+            signal.signal_type in deviation_types
+            and signal.severity in {SignalSeverity.MEDIUM, SignalSeverity.HIGH}
+            for signal in semantic_result.signals
+        )
+        if not has_auditable_deviation:
+            raise MonitorProcessingError(
+                "Semantic assessment lowered a control-relevant score without "
+                "auditable MEDIUM/HIGH semantic deviation evidence"
+            )
 
     def _maybe_issue_repair(
         self,
