@@ -280,19 +280,19 @@ def slow_scope_creep() -> EvaluationScenario:
             ),
             ScenarioStep(
                 turn=second,
-                assessment=_assessment(second, scope=0.75, consistency=0.78, signal_ids=(second_signal.signal_id,)),
+                assessment=_assessment(second, scope=0.75, consistency=0.90, signal_ids=(second_signal.signal_id,)),
                 semantic_signals=(second_signal,),
                 expected_status=CoherenceStatus.WATCH,
             ),
             ScenarioStep(
                 turn=third,
-                assessment=_assessment(third, scope=0.72, consistency=0.74, signal_ids=(third_signal.signal_id,)),
+                assessment=_assessment(third, scope=0.72, consistency=0.90, signal_ids=(third_signal.signal_id,)),
                 semantic_signals=(third_signal,),
                 expected_status=CoherenceStatus.DRIFTING,
             ),
             ScenarioStep(
                 turn=fourth,
-                assessment=_assessment(fourth, scope=0.68, consistency=0.70, signal_ids=(fourth_signal.signal_id,)),
+                assessment=_assessment(fourth, scope=0.68, consistency=0.90, signal_ids=(fourth_signal.signal_id,)),
                 semantic_signals=(fourth_signal,),
                 expected_status=CoherenceStatus.REALIGN_REQUIRED,
             ),
